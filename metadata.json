@@ -1,0 +1,5 @@
+{
+  "name": "AI 카드 스튜디오",
+  "description": "AI로 생성된 텍스트, 이미지, 음성으로 나만의 카드를 만들어보세요.",
+  "requestFramePermissions": []
+}
