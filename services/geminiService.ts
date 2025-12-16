@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality, Schema, Type } from "@google/genai";
-import { MessageLength } from "../types";
+import { MessageLength, FontOptions } from "../types";
 
 // Initialize Gemini Client
 // @ts-ignore - process.env.API_KEY is injected by the environment
@@ -93,6 +93,52 @@ export const generateEnglishCaption = async (theme: string): Promise<string> => 
     }
 };
 
+// --- Font Recommendation ---
+export const recommendFont = async (theme: string, messageContent: string): Promise<string> => {
+    try {
+        // Prepare simplified font list string to save tokens and clarity
+        const availableFonts = FontOptions.map(f => `${f.name} (Value: ${f.value})`).join(', ');
+        
+        const prompt = `Select the single best matching Korean font from the list below for a greeting card.
+        Context - Theme: "${theme}", Message Mood: "${messageContent.substring(0, 50)}...".
+        
+        Available Fonts: ${availableFonts}.
+        
+        Guidelines:
+        - "Handwriting/Cute" (Nanum Pen Script, Hi Melody, Gaegu, Single Day, Cute Font, Gamja Flower, Sunflower) -> Good for casual, birthday, love, friends.
+        - "Serif/Traditional" (Noto Serif KR, Nanum Myeongjo, Gungsuh-style, Yeon Sung, Song Myung) -> Good for thank you, new year, elders, respectful.
+        - "Bold/Display" (Black Han Sans, Jua, Do Hyeon, Bagel Fat One) -> Good for emphasis, cheer up, celebration titles.
+        - "Clean/Modern" (Noto Sans KR, Gowun Dodum) -> Safe fallback.
+        
+        Return ONLY the font value in JSON format.
+        Example: {"font": "Nanum Pen Script"}`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        font: { type: Type.STRING }
+                    }
+                }
+            }
+        });
+
+        const json = JSON.parse(response.text || "{}");
+        const recommended = json.font;
+        
+        // Validate
+        const isValid = FontOptions.some(f => f.value === recommended);
+        return isValid ? recommended : FontOptions[0].value;
+    } catch (error) {
+        console.error("Font Rec Error:", error);
+        return FontOptions[0].value;
+    }
+};
+
 // --- Sticker Generation ---
 export const generateThemeStickers = async (theme: string): Promise<string[]> => {
     try {
@@ -117,7 +163,8 @@ export const generateThemeStickers = async (theme: string): Promise<string[]> =>
         return stickers.length > 0 ? stickers : ["✨", "❤️", "🎁", "😊"];
     } catch (error) {
         console.error("Sticker Gen Error:", error);
-        return ["✨", "❤️", "🎈", "🎉", "🌟", "🎂", "🎁", "😊", "🌈", "🍀"];
+        // Fallback with 20 items (expanded from 10)
+        return ["✨", "❤️", "🎈", "🎉", "🌟", "🎂", "🎁", "😊", "🌈", "🍀", "🌸", "🎵", "📷", "💌", "🧸", "🍫", "🎀", "🌻", "🍰", "🍭"];
     }
 };
 

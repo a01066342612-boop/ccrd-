@@ -14,11 +14,12 @@ const App: React.FC = () => {
     recipient: '', 
     recipientPosition: { x: 0, y: 0 },
     sender: '',
-    senderLabel: 'From', 
+    senderLabel: 'From.', 
     senderPosition: { x: 0, y: 0 },
     
-    englishCaption: 'Merry Christmas', 
-    englishCaptionPosition: { x: 0, y: 0 },
+    englishCaption: 'Wishing You a Merry Christmas', 
+    englishCaptionPosition: { x: 0, y: 0 }, // Reset to 0 since it is now flow-relative in the middle
+    englishCaptionScale: 1,
 
     message: '',
     messageLength: 'medium',
@@ -143,6 +144,11 @@ const App: React.FC = () => {
       }
   };
 
+  const handleShuffleFont = () => {
+    const randomFont = FontOptions[Math.floor(Math.random() * FontOptions.length)].value;
+    updateCardData({ font: randomFont });
+  };
+
   const handleAddSticker = (content: string) => {
       const newDecoration: Decoration = {
           id: Date.now().toString() + Math.random().toString(),
@@ -164,10 +170,20 @@ const App: React.FC = () => {
     const randomMask = ImageMaskOptions[Math.floor(Math.random() * ImageMaskOptions.length)].value;
     const randomBorder = ImageBorderOptions[Math.floor(Math.random() * ImageBorderOptions.length)].value;
     
-    // Sometimes random background color, sometimes auto
+    // Random Background
     const useRandomColor = Math.random() > 0.5;
     const randomColor = useRandomColor ? '#' + Math.floor(Math.random()*16777215).toString(16) : 'auto';
 
+    // Random Caption from list to avoid API latency on shuffle
+    const randomCaptions = [
+        "Best Wishes", "Seize the Day", "Sending Love", "Good Vibes Only", "Make a Wish", 
+        "Stay Awesome", "Hello There", "Just for You", "Special Moments", "Dream Big",
+        "Happy Day", "With Love", "Thinking of You", "You Shine", "Magic Moments",
+        "Stay Wild", "Be Happy", "Enjoy Today", "Smile More", "Love You"
+    ];
+    const randomCaption = randomCaptions[Math.floor(Math.random() * randomCaptions.length)];
+
+    // Update Visuals Only
     updateCardData({
         design: randomDesign,
         messageBoxStyle: randomBoxStyle,
@@ -175,7 +191,8 @@ const App: React.FC = () => {
         imageStyle: randomImageStyle,
         imageMask: randomMask,
         imageBorder: randomBorder,
-        backgroundColor: randomColor
+        backgroundColor: randomColor,
+        englishCaption: randomCaption
     });
   };
   
@@ -203,6 +220,7 @@ const App: React.FC = () => {
           onGenerateCaption={handleGenerateCaption}
           onGenerateStickers={handleGenerateStickers}
           onGenerateBackgroundColor={handleGenerateBackgroundColor}
+          onShuffleFont={handleShuffleFont}
           onAddSticker={handleAddSticker}
           onRandomTemplate={handleRandomTemplate}
           isGeneratingText={loadingStates.text}

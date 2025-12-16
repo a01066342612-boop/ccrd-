@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { CardData, CardTheme, CardDesign, MessageBoxStyle, Decoration, ImageMask, ImageBorder } from '../types';
-import { Download, Smartphone, X, Image as ImageIcon, Move, Trash2, RotateCw, Maximize2, Minimize2 } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { Download, Smartphone, X, Image as ImageIcon, Move, Trash2, RotateCw, Maximize2, Minimize2, Scaling, Loader2 } from 'lucide-react';
+import { toPng } from 'html-to-image';
 
 interface PreviewPanelProps {
   data: CardData;
@@ -27,7 +27,7 @@ const ThemeStyles: Record<CardTheme, string> = {
 
 interface DragState {
     type: 'message' | 'image' | 'decoration' | 'caption' | 'recipient' | 'sender';
-    action: 'move' | 'rotate' | 'scale';
+    action: 'move' | 'rotate' | 'scale' | 'resize';
     id?: string;
     
     startX: number;
@@ -41,6 +41,10 @@ interface DragState {
     initialScale?: number;
     centerX?: number;
     centerY?: number;
+
+    // For resizing (image/box)
+    initialWidth?: number; // %
+    initialHeight?: number; // px
 }
 
 const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, onToggleViewMode, onUpdateData }) => {
@@ -52,30 +56,35 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
   // Drag State
   const [dragState, setDragState] = useState<DragState | null>(null);
 
+  // Download State
+  const [isDownloading, setIsDownloading] = useState(false);
+
   const handleDownload = async () => {
-    if (!cardRef.current) return;
+    if (!cardRef.current || isDownloading) return;
     // Temporarily deselect to hide handles
     const prevSelected = selectedId;
     setSelectedId(null);
+    setIsDownloading(true);
     
     try {
-        await new Promise(resolve => setTimeout(resolve, 100)); 
-        const canvas = await html2canvas(cardRef.current, {
-            scale: 3, 
-            backgroundColor: null,
-            useCORS: true, 
-            logging: false,
-            allowTaint: true,
+        await new Promise(resolve => setTimeout(resolve, 50)); // Short delay to allow UI update
+        
+        const dataUrl = await toPng(cardRef.current, {
+            cacheBust: false, // Disabled to improve speed
+            pixelRatio: 2, // Reduced from 3 to 2 for better performance while maintaining good quality
+            skipAutoScale: true,
         });
+
         const link = document.createElement('a');
         link.download = `ai-card-${Date.now()}.png`;
-        link.href = canvas.toDataURL('image/png', 1.0);
+        link.href = dataUrl;
         link.click();
     } catch (err) {
         console.error("Download failed", err);
-        alert("이미지 저장 중 오류가 발생했습니다.");
+        alert("이미지 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     } finally {
         setSelectedId(prevSelected);
+        setIsDownloading(false);
     }
   };
 
@@ -83,7 +92,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
   const handlePointerDown = (
       e: React.PointerEvent, 
       type: 'message' | 'image' | 'decoration' | 'caption' | 'recipient' | 'sender', 
-      action: 'move' | 'rotate' | 'scale' = 'move',
+      action: 'move' | 'rotate' | 'scale' | 'resize' = 'move',
       id?: string
   ) => {
     e.preventDefault();
@@ -95,16 +104,35 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
     let initialScale = 1;
     let centerX = 0;
     let centerY = 0;
+    let initialWidth = 0;
+    let initialHeight = 0;
 
     if (type === 'message') {
         initialX = data.messagePosition.x;
         initialY = data.messagePosition.y;
+        initialWidth = data.messageBoxWidth;
+        setSelectedId('message-box');
     } else if (type === 'image') {
         initialX = data.imagePosition.x;
         initialY = data.imagePosition.y;
+        initialWidth = data.imageWidth;
+        initialHeight = data.imageHeight;
+        setSelectedId('image-box');
     } else if (type === 'caption') {
         initialX = data.englishCaptionPosition.x;
         initialY = data.englishCaptionPosition.y;
+        initialScale = data.englishCaptionScale || 1;
+        setSelectedId('caption-box');
+
+        // Calculate center for scaling
+        if (action === 'scale') {
+            const el = e.currentTarget.closest('.group\\/caption');
+            if (el) {
+                const rect = el.getBoundingClientRect();
+                centerX = rect.left + rect.width / 2;
+                centerY = rect.top + rect.height / 2;
+            }
+        }
     } else if (type === 'recipient') {
         initialX = data.recipientPosition.x;
         initialY = data.recipientPosition.y;
@@ -143,7 +171,9 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
         initialRotation,
         initialScale,
         centerX,
-        centerY
+        centerY,
+        initialWidth,
+        initialHeight
     });
   };
 
@@ -161,7 +191,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
       if (!dragState || !onUpdateData) return;
       e.preventDefault();
       
-      const { type, action, id, startX, startY, initialX, initialY, initialRotation, initialScale, centerX, centerY } = dragState;
+      const { type, action, id, startX, startY, initialX, initialY, initialRotation, initialScale, centerX, centerY, initialWidth, initialHeight } = dragState;
 
       if (action === 'move') {
           const dx = e.clientX - startX;
@@ -186,6 +216,29 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
                   )
               });
           }
+      } else if (action === 'resize') {
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+          const cardWidth = cardRef.current?.clientWidth || 1000;
+          
+          if (type === 'image') {
+              // Width (%), Height (px)
+              const widthChangePercent = (dx / cardWidth) * 100;
+              const newWidth = Math.min(100, Math.max(20, (initialWidth || 100) + widthChangePercent));
+              const newHeight = Math.max(50, (initialHeight || 300) + dy);
+              onUpdateData({ 
+                  imageWidth: newWidth,
+                  imageHeight: newHeight
+              });
+          } else if (type === 'message') {
+              // Width (%)
+              const widthChangePercent = (dx / cardWidth) * 100;
+              const newWidth = Math.min(100, Math.max(30, (initialWidth || 90) + widthChangePercent));
+              onUpdateData({ 
+                  messageBoxWidth: newWidth 
+              });
+          }
+
       } else if (action === 'rotate' && type === 'decoration' && id && centerX !== undefined && centerY !== undefined) {
           // Calculate angle
           const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
@@ -200,21 +253,34 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
               )
           });
 
-      } else if (action === 'scale' && type === 'decoration' && id && centerX !== undefined && centerY !== undefined) {
-          // Calculate distance
-          const currentDist = Math.hypot(e.clientX - centerX, e.clientY - centerY);
-          const startDist = Math.hypot(startX - centerX, startY - centerY);
-          
-          // Avoid division by zero
-          if (startDist > 0) {
-              const scaleRatio = currentDist / startDist;
-              const newScale = Math.max(0.2, (initialScale || 1) * scaleRatio); // Min scale 0.2
+      } else if (action === 'scale') {
+          if (type === 'decoration' && id && centerX !== undefined && centerY !== undefined) {
+              // Calculate distance
+              const currentDist = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+              const startDist = Math.hypot(startX - centerX, startY - centerY);
               
-              onUpdateData({
-                  decorations: data.decorations.map(d => 
-                      d.id === id ? { ...d, scale: newScale } : d
+              // Avoid division by zero
+              if (startDist > 0) {
+                  const scaleRatio = currentDist / startDist;
+                  const newScale = Math.max(0.2, (initialScale || 1) * scaleRatio); // Min scale 0.2
+                  
+                  onUpdateData({
+                      decorations: data.decorations.map(d => 
+                          d.id === id ? { ...d, scale: newScale } : d
                   )
-              });
+                  });
+              }
+          } else if (type === 'caption' && centerX !== undefined && centerY !== undefined) {
+             // Scale caption text
+              const currentDist = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+              const startDist = Math.hypot(startX - centerX, startY - centerY);
+              
+              if (startDist > 0) {
+                  const scaleRatio = currentDist / startDist;
+                  const newScale = Math.max(0.5, (initialScale || 1) * scaleRatio); // Min scale 0.5
+                  
+                  onUpdateData({ englishCaptionScale: newScale });
+              }
           }
       }
     };
@@ -272,7 +338,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
         case 'calendar_sheet': return 'rounded-lg border-t-[30px] border-red-500 shadow-md p-8 relative after:content-[""] after:absolute after:top-[-35px] after:left-1/2 after:-translate-x-1/2 after:w-4 after:h-4 after:bg-white after:rounded-full';
         case 'vinyl_record': return 'rounded-full aspect-square border-[40px] border-black bg-slate-900 p-16 text-white shadow-2xl';
 
-        // NEW 10 Designs
+        // 10 Old Extras
         case 'passport': return 'bg-[#4a1c1c] text-[#e0c080] rounded-r-xl border-l-[12px] border-black/20 shadow-xl p-8';
         case 'credit_card': return 'rounded-xl bg-gradient-to-r from-slate-700 to-slate-900 text-white shadow-xl p-8 border border-white/20 relative overflow-hidden';
         case 'cassette': return 'bg-slate-800 text-white rounded-lg border-[16px] border-slate-700 p-8 shadow-xl relative before:content-[""] before:absolute before:bottom-4 before:left-1/2 before:-translate-x-1/2 before:w-1/2 before:h-24 before:bg-white/10 before:rounded-full';
@@ -284,6 +350,30 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
         case 'messenger': return 'bg-[#b2c7d9] text-black p-4 shadow-inner border border-slate-300';
         case 'retro_mac': return 'bg-white text-black border-2 border-black shadow-[4px_4px_0_black] rounded-t-lg p-0 overflow-hidden';
         
+        // Old 10
+        case 'magazine': return 'bg-cover bg-center text-white p-0 relative shadow-2xl overflow-hidden after:content-["VOGUE"] after:absolute after:top-4 after:left-1/2 after:-translate-x-1/2 after:text-[5rem] after:font-serif after:font-bold after:text-white/80';
+        case 'album_cover': return 'aspect-square bg-slate-900 text-white p-8 shadow-2xl border border-white/10 relative flex flex-col justify-end';
+        case 'id_card': return 'bg-white text-black rounded-lg border border-slate-200 shadow-lg p-6 relative before:absolute before:top-[-20px] before:left-1/2 before:-translate-x-1/2 before:w-16 before:h-20 before:bg-blue-900 before:-z-10 before:rounded-b-lg';
+        case 'game_cartridge': return 'bg-gray-400 text-black rounded-t-lg rounded-b-sm border-b-[20px] border-b-gray-600 p-8 shadow-xl relative before:absolute before:top-4 before:left-1/2 before:-translate-x-1/2 before:w-3/4 before:h-32 before:bg-white before:rounded-md before:border-2 before:border-gray-500';
+        case 'billboard': return 'aspect-video bg-white border-[10px] border-black p-0 shadow-2xl relative after:absolute after:bottom-[-40px] after:left-1/2 after:-translate-x-1/2 after:w-4 after:h-10 after:bg-gray-800';
+        case 'cinema_ticket': return 'bg-[#f4e4bc] border-dashed border-x-4 border-black/20 p-8 [mask-image:radial-gradient(circle_at_left,transparent_10px,black_11px),radial-gradient(circle_at_right,transparent_10px,black_11px)] [mask-size:50%_100%] [mask-position:left,right] [mask-repeat:no-repeat]';
+        case 'browser_retro': return 'bg-[#c0c0c0] border-t-2 border-white border-l-2 border-white border-r-2 border-gray-600 border-b-2 border-gray-600 p-1 shadow-xl';
+        case 'smartphone_chat': return 'bg-slate-100 text-black rounded-[2rem] border-8 border-black p-4 shadow-xl';
+        case 'instant_camera': return 'bg-white p-4 pb-16 shadow-lg border border-slate-100 text-center font-handwriting';
+        case 'vinyl_sleeve': return 'bg-[#eec] p-8 shadow-lg border border-black/5 rounded-sm relative after:absolute after:right-[-40px] after:top-1/2 after:-translate-y-1/2 after:w-40 after:h-40 after:bg-black after:rounded-full after:-z-10 after:border-[10px] after:border-[#111]';
+
+        // NEW 10
+        case 'music_player': return 'bg-gray-100 text-black rounded-xl border border-gray-300 shadow-xl p-6 pb-24 relative after:content-[""] after:absolute after:bottom-4 after:left-1/2 after:-translate-x-1/2 after:w-16 after:h-16 after:rounded-full after:border-4 after:border-gray-300 after:bg-white';
+        case 'browser_popup': return 'bg-white border-2 border-gray-400 shadow-[4px_4px_0_rgba(0,0,0,0.5)] p-0 pt-8 relative before:content-["Error_404.exe"] before:absolute before:top-0 before:left-0 before:right-0 before:h-8 before:bg-blue-800 before:text-white before:flex before:items-center before:px-2 before:font-bold before:text-sm';
+        case 'tarot_card': return 'bg-[#fff] border-[12px] border-double border-yellow-600 rounded-xl p-4 pb-12 shadow-2xl relative after:content-["THE_STAR"] after:absolute after:bottom-4 after:left-1/2 after:-translate-x-1/2 after:font-serif after:text-sm after:tracking-widest';
+        case 'milk_carton': return 'bg-blue-50 border-t-[40px] border-t-blue-400 shadow-lg p-8 [clip-path:polygon(0%_10%,50%_0%,100%_10%,100%_100%,0%_100%)]';
+        case 'shopping_bag': return 'bg-pink-100 border-b-8 border-b-pink-200 shadow-lg p-8 relative before:content-[""] before:absolute before:-top-8 before:left-1/2 before:-translate-x-1/2 before:w-20 before:h-16 before:border-[6px] before:border-pink-300 before:rounded-t-full';
+        case 'lock_screen': return 'bg-black/80 text-white backdrop-blur-md rounded-none shadow-none border-t-4 border-white/20 p-8 pt-20 relative after:content-["12:00"] after:absolute after:top-8 after:left-1/2 after:-translate-x-1/2 after:text-4xl after:font-thin';
+        case 'poker_card': return 'bg-white border border-gray-200 rounded-xl p-8 shadow-lg relative after:content-["♥"] after:absolute after:top-2 after:left-2 after:text-red-500 after:text-xl before:content-["♥"] before:absolute before:bottom-2 before:right-2 before:text-red-500 before:text-xl before:rotate-180';
+        case 'floppy_back': return 'bg-[#333] rounded-sm p-4 pt-12 shadow-lg relative after:content-[""] after:absolute after:top-0 after:left-4 after:w-20 after:h-16 after:bg-gray-400 after:rounded-b-md';
+        case 'train_ticket': return 'bg-orange-100 border-dashed border-x-4 border-orange-300 p-6 shadow-md font-mono text-orange-900';
+        case 'post_it_wall': return 'bg-yellow-200 shadow-xl rotate-2 p-8 relative after:content-[""] after:absolute after:inset-0 after:bg-yellow-100 after:rotate-[-4deg] after:-z-10 after:shadow-md';
+
         default: return 'rounded-2xl p-8';
     }
   };
@@ -349,6 +439,18 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
           case 'holographic': return 'bg-gradient-to-br from-pink-300 via-purple-300 to-indigo-400 text-white border-none shadow-lg opacity-90 backdrop-blur-md';
           case 'parchment_old': return 'bg-[#f0e68c] text-[#554433] shadow-md [mask-image:url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.8\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\' opacity=\'0.5\'/%3E%3C/svg%3E"),linear-gradient(black,black)]';
 
+          // New 10
+          case 'chat_bubble_ios': return 'bg-[#007aff] text-white rounded-2xl p-4 shadow-sm';
+          case 'toast_dark': return 'bg-[#333] text-white rounded-full px-6 py-3 shadow-lg flex items-center gap-2';
+          case 'coding_terminal': return 'bg-[#1e1e1e] text-[#00ff00] font-mono border border-[#333] p-4 rounded shadow-md';
+          case 'watercolor_patch': return 'bg-pink-100 p-6 rounded-[30%_70%_70%_30%/30%_30%_70%_70%] shadow-sm opacity-90';
+          case 'sticky_crumpled': return 'bg-[#fff740] p-4 shadow-md rotate-[-1deg] [mask-image:url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.02\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\' opacity=\'1\'/%3E%3C/svg%3E")]';
+          case 'glass_frosted': return 'bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl shadow-lg text-white';
+          case 'neon_frame': return 'border-2 border-[#f0f] shadow-[0_0_10px_#f0f,inset_0_0_10px_#f0f] bg-transparent text-[#f0f] p-4 rounded-lg';
+          case 'dashed_cutout': return 'border-2 border-dashed border-gray-400 bg-white p-4 rounded-lg';
+          case 'embossed': return 'bg-gray-100 text-gray-700 p-4 rounded shadow-[inset_2px_2px_5px_rgba(0,0,0,0.1),inset_-2px_-2px_5px_rgba(255,255,255,0.8)]';
+          case 'cyberpunk_panel': return 'bg-[#0b0b0b] border-l-4 border-yellow-400 text-yellow-400 p-4 font-mono shadow-[5px_5px_0_rgba(250,204,21,0.2)]';
+
           default: return '';
       }
   };
@@ -360,6 +462,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
          // Default text to slate-900 if custom bg is used, unless design overrides
          if (design === 'polaroid' || design === 'phone' || design === 'window' || design === 'browser' || design === 'retro_mac' || design === 'social_post') return 'text-slate-900 shadow-xl';
          if (design === 'game' || design === 'cassette') return 'text-white shadow-xl';
+         if (design === 'lock_screen') return 'text-white shadow-xl';
          return 'text-slate-900 shadow-2xl'; // Default container class for custom bg
       }
 
@@ -373,6 +476,18 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
       if (design === 'paper_scroll') return 'bg-[#f8f1e0] text-[#5c4d3c] shadow-lg';
       
       return ThemeStyles[data.theme];
+  };
+
+  const getRecipientPositionClass = (design: CardDesign) => {
+      if (['window', 'browser', 'retro_mac', 'browser_retro', 'browser_popup'].includes(design)) return 'top-14 left-6';
+      if (design === 'social_post') return 'top-20 left-6';
+      if (design === 'clipboard') return 'top-16 left-6';
+      if (design === 'calendar_sheet') return 'top-14 left-6';
+      if (design === 'folder') return 'top-8 left-6';
+      if (design === 'floppy') return 'top-12 left-6';
+      if (design === 'video_thumbnail') return 'top-6 left-6 z-30 drop-shadow-md';
+      if (design === 'milk_carton') return 'top-12 left-6';
+      return 'top-6 left-6';
   };
 
   // --- Image Mask Logic ---
@@ -417,6 +532,42 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
       if (mask === 'chat_bubble') return { borderRadius: '20px 20px 20px 0' };
       if (mask === 'stamp_detailed') return { maskImage: 'radial-gradient(circle, transparent 2px, black 3px)', maskSize: '10px 10px', maskRepeat: 'round' };
 
+      // Old 10
+      if (mask === 'ink_splat') return { clipPath: 'polygon(20% 0, 80% 10%, 100% 35%, 90% 80%, 50% 100%, 10% 85%, 0 40%, 10% 10%)' }; 
+      if (mask === 'brush_stroke_mask') return { clipPath: 'polygon(0 10%, 100% 0, 95% 90%, 5% 100%)' };
+      if (mask === 'puzzle_double') return { clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)' }; 
+      if (mask === 'stamp_grunge') return { maskImage: 'radial-gradient(circle, transparent 2px, black 3px)', maskSize: '8px 8px', maskRepeat: 'round' };
+      if (mask === 'torn_edge_mask') return { clipPath: 'polygon(0 0, 100% 0, 100% 90%, 95% 100%, 90% 90%, 85% 100%, 80% 90%, 75% 100%, 70% 90%, 65% 100%, 60% 90%, 55% 100%, 50% 90%, 45% 100%, 40% 90%, 35% 100%, 30% 90%, 25% 100%, 20% 90%, 15% 100%, 10% 90%, 5% 100%, 0 90%)' };
+      if (mask === 'film_perforated_mask') return { maskImage: 'radial-gradient(circle, transparent 4px, black 5px)', maskSize: '20px 20px', maskPosition: '0 0, 0 100%' };
+      if (mask === 'heart_pixel') return { clipPath: 'polygon(20% 20%, 40% 0, 60% 0, 80% 20%, 100% 40%, 50% 90%, 0 40%)' };
+      if (mask === 'star_burst') return { clipPath: 'polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%)' };
+      if (mask === 'cloud_soft') return { borderRadius: '50% 50% 50% 50% / 60% 60% 40% 40%' };
+      if (mask === 'window_arch_gothic') return { borderRadius: '50% 50% 0 0', clipPath: 'polygon(0 50%, 50% 0, 100% 50%, 100% 100%, 0 100%)' };
+
+      // New 10
+      if (mask === 'brush_heavy') return { clipPath: 'polygon(5% 0, 95% 5%, 100% 90%, 80% 95%, 10% 100%)' };
+      if (mask === 'blob_scatter') return { borderRadius: '64% 36% 27% 73% / 55% 58% 42% 45%' };
+      if (mask === 'window_pane') return { clipPath: 'polygon(0 0, 45% 0, 45% 45%, 0 45%, 0 0, 55% 0, 100% 0, 100% 45%, 55% 45%, 55% 0, 0 55%, 45% 55%, 45% 100%, 0 100%, 0 55%, 55% 55%, 100% 55%, 100% 100%, 55% 100%, 55% 55%)' };
+      if (mask === 'key_shape') return { clipPath: 'polygon(30% 0, 70% 0, 70% 20%, 60% 20%, 60% 60%, 80% 60%, 80% 70%, 60% 70%, 60% 80%, 80% 80%, 80% 90%, 60% 90%, 60% 100%, 40% 100%, 40% 20%, 30% 20%)' };
+      if (mask === 'lamp_bulb') return { borderRadius: '50% 50% 40% 40% / 60% 60% 30% 30%', clipPath: 'polygon(20% 0, 80% 0, 100% 50%, 70% 100%, 30% 100%, 0 50%)' };
+      if (mask === 'leaf_monstera') return { borderRadius: '50% 0 50% 50%' };
+      if (mask === 'paw_print') return { clipPath: 'circle(15% at 20% 20%), circle(15% at 50% 10%), circle(15% at 80% 20%), circle(30% at 50% 60%)' }; // Requires multiple elements usually, approx with poly or simple shapes. CSS clip-path doesn't support multiple shapes easily without SVG ref. Using fallback circle for now.
+      if (mask === 'crown_shape') return { clipPath: 'polygon(0 20%, 25% 80%, 50% 20%, 75% 80%, 100% 20%, 100% 100%, 0 100%)' };
+      if (mask === 'dripping_paint') return { clipPath: 'polygon(0 0, 100% 0, 100% 75%, 90% 85%, 80% 75%, 70% 90%, 60% 75%, 50% 85%, 40% 75%, 30% 90%, 20% 75%, 10% 85%, 0 75%)' };
+      if (mask === 'slash_cut') return { clipPath: 'polygon(20% 0, 100% 0, 80% 100%, 0% 100%)' };
+
+      // New 10 (Last Batch)
+      if (mask === 'bevel_corners') return { clipPath: 'polygon(20% 0, 80% 0, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0 80%, 0 20%)' };
+      if (mask === 'ticket_stub_vertical') return { maskImage: 'radial-gradient(circle at 50% 0, transparent 15px, black 16px), radial-gradient(circle at 50% 100%, transparent 15px, black 16px)', maskComposite: 'intersect' };
+      if (mask === 'shield_round') return { borderRadius: '0 0 50% 50%' };
+      if (mask === 'blob_organic_3') return { borderRadius: '42% 58% 70% 30% / 45% 45% 55% 55%' };
+      if (mask === 'star_fat_5') return { clipPath: 'polygon(50% 0%, 63% 38%, 100% 38%, 69% 59%, 82% 100%, 50% 75%, 18% 100%, 31% 59%, 0% 38%, 37% 38%)' };
+      if (mask === 'cross_rounded') return { clipPath: 'polygon(20% 0, 80% 0, 80% 20%, 100% 20%, 100% 80%, 80% 80%, 80% 100%, 20% 100%, 20% 80%, 0 80%, 0 20%, 20% 20%)', borderRadius: '1rem' }; // Radius trick doesn't work well with polygon, leaving straight polygon
+      if (mask === 'leaf_pointed') return { borderRadius: '0 50% 0 50%' };
+      if (mask === 'hexagon_soft') return { clipPath: 'polygon(25% 5%, 75% 5%, 95% 50%, 75% 95%, 25% 95%, 5% 50%)', borderRadius: '20px' };
+      if (mask === 'message_box_tail') return { clipPath: 'polygon(0% 0%, 100% 0%, 100% 75%, 75% 75%, 75% 100%, 50% 75%, 0% 75%)' };
+      if (mask === 'stamp_circle_notch') return { maskImage: 'radial-gradient(circle, black 60%, transparent 65%)', maskSize: '20px 20px', maskRepeat: 'repeat' }; // Experimental for inverse dots, fallback simple circle
+
       return {};
   };
 
@@ -451,17 +602,28 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
           case 'film_perforation': return 'border-x-[12px] border-black border-dashed';
           case 'tape_corners': return 'border-none shadow-md'; 
 
-          // NEW 10 Borders
-          case 'braided': return 'border-4 border-dashed border-slate-400 rounded-sm'; // Approximation
-          case 'chain': return 'border-4 border-dotted border-slate-500 rounded-full'; // Approximation
+          case 'braided': return 'border-4 border-dashed border-slate-400 rounded-sm'; 
+          case 'chain': return 'border-4 border-dotted border-slate-500 rounded-full'; 
           case 'lace': return 'border-[8px] border-white border-dotted shadow-sm';
           case 'pearls': return 'border-[4px] border-white border-dotted ring-1 ring-slate-200';
-          case 'scalloped': return 'p-2 bg-white [mask-image:radial-gradient(circle,white_0,white_5px,transparent_6px)] [mask-size:12px_12px]'; // Use as inner padding frame
+          case 'scalloped': return 'p-2 bg-white [mask-image:radial-gradient(circle,white_0,white_5px,transparent_6px)] [mask-size:12px_12px]'; 
           case 'film_slide': return 'bg-white p-4 pb-8 shadow-md text-center';
           case 'gradient_ring': return 'border-4 border-transparent bg-gradient-to-r from-pink-500 to-yellow-500 bg-origin-border';
           case 'glitch': return 'border-2 border-red-500 shadow-[2px_0_0_blue,-2px_0_0_green]';
           case 'sketchy_double': return 'border-2 border-black rounded-sm outline outline-2 outline-black outline-offset-4 [transform:rotate(1deg)]';
           case 'rainbow_dashed': return 'border-4 border-dashed border-indigo-400 ring-2 ring-pink-300 ring-offset-2';
+
+          // NEW 10 Borders
+          case 'vignette': return 'shadow-[inset_0_0_20px_20px_rgba(0,0,0,0.5)]';
+          case 'notched': return '[clip-path:polygon(10%_0,100%_0,100%_90%,90%_100%,0_100%,0_10%)]';
+          case 'feathered': return '[mask-image:radial-gradient(circle,black_60%,transparent_100%)]';
+          case 'crosshair': return 'relative after:absolute after:top-1/2 after:left-1/2 after:-translate-x-1/2 after:-translate-y-1/2 after:w-full after:h-[1px] after:bg-white/30 before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-[1px] before:h-full before:bg-white/30 border border-white/50';
+          case 'warning': return 'border-[8px] border-yellow-400 [border-image:repeating-linear-gradient(45deg,yellow_0,yellow_10px,black_10px,black_20px)_20]';
+          case 'stitching': return 'border-4 border-transparent outline outline-2 outline-dashed outline-white -outline-offset-8 shadow-[0_0_0_4px_rgba(0,0,0,0.2)]';
+          case 'scanner': return 'relative overflow-hidden after:content-[""] after:absolute after:top-0 after:left-0 after:w-full after:h-[2px] after:bg-green-400 after:shadow-[0_0_10px_#4ade80] after:animate-[scanline_2s_linear_infinite] border border-green-500/50';
+          case 'crt': return 'relative after:content-[""] after:absolute after:inset-0 after:bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] after:bg-[length:100%_2px,3px_100%] after:pointer-events-none';
+          case 'blueprint_grid': return 'border-2 border-white/50 [background-image:linear-gradient(rgba(255,255,255,0.2)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.2)_1px,transparent_1px)] [background-size:20px_20px]';
+          case 'glowing_edges': return 'shadow-[0_0_10px_cyan,0_0_20px_magenta] border-2 border-white/20';
 
           default: return '';
       }
@@ -498,7 +660,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
       </svg>
 
       {/* Toolbar */}
-      <div className={`w-full max-w-lg md:max-w-xl flex justify-end mb-4 shrink-0 gap-2 transition-opacity duration-300 z-50 ${isViewMode ? 'absolute top-6 right-6' : 'relative'}`}>
+      <div className={`w-full max-w-lg md:max-w-xl flex justify-end mb-4 shrink-0 gap-2 transition-opacity duration-300 z-50 ${isViewMode ? 'fixed top-6 right-6' : 'relative'}`}>
         {!isViewMode ? (
           <>
             <button 
@@ -510,27 +672,30 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
             </button>
             <button 
                onClick={handleDownload}
-               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md transition-colors text-sm font-bold"
+               disabled={isDownloading}
+               className={`flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md transition-colors text-sm font-bold ${isDownloading ? 'opacity-75 cursor-wait' : ''}`}
             >
-                <Download className="w-4 h-4" />
-                이미지 저장
+                {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {isDownloading ? '저장 중...' : '이미지 저장'}
             </button>
           </>
         ) : (
           <>
              <button 
                onClick={handleDownload}
-               className="flex items-center justify-center w-10 h-10 bg-white/10 text-white rounded-full hover:bg-white/20 backdrop-blur-md transition-colors mr-2"
+               disabled={isDownloading}
+               className={`flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg transition-all font-bold text-sm ${isDownloading ? 'opacity-75 cursor-wait' : ''}`}
                title="이미지 저장"
              >
-                <Download className="w-5 h-5" />
+                {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                <span>{isDownloading ? '저장 중...' : '이미지 저장'}</span>
              </button>
              <button 
                 onClick={onToggleViewMode}
-                className="flex items-center justify-center w-10 h-10 bg-white/10 text-white rounded-full hover:bg-white/20 backdrop-blur-md transition-colors"
-                title="편집 모드로 돌아가기"
+                className="flex items-center justify-center w-10 h-10 bg-white/10 text-white rounded-full hover:bg-white/20 backdrop-blur-md transition-colors border border-white/10"
+                title="닫기"
              >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
              </button>
           </>
         )}
@@ -551,7 +716,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
           {data.design === 'phone' && (
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-slate-800 rounded-b-xl z-20"></div>
           )}
-          {['window', 'browser', 'retro_mac'].includes(data.design) && (
+          {['window', 'browser', 'retro_mac', 'browser_retro', 'browser_popup'].includes(data.design) && (
               <div className={`w-full h-10 ${data.design === 'retro_mac' ? 'bg-white border-b-2 border-black' : 'bg-slate-100 border-b border-slate-300'} flex items-center px-4 gap-2 shrink-0 absolute top-0 left-0 right-0 z-20`}>
                   {data.design === 'retro_mac' ? (
                       <>
@@ -596,9 +761,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
           {/* Draggable Recipient */}
           {data.recipient && (
               <div 
-                  className={`absolute z-30 font-bold group/recipient cursor-move 
-                    ${['window', 'browser', 'retro_mac'].includes(data.design) ? 'top-14 left-6' : ''} 
-                    ${data.design === 'social_post' ? 'top-20 left-6' : 'top-6 left-6'}`}
+                  className={`absolute z-30 font-bold group/recipient cursor-move ${getRecipientPositionClass(data.design)}`}
                   style={{
                       transform: `translate(${data.recipientPosition.x}px, ${data.recipientPosition.y}px)`,
                       touchAction: 'none'
@@ -612,14 +775,15 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
               </div>
           )}
 
-          <div className={`w-full ${['window', 'browser', 'retro_mac'].includes(data.design) ? 'pt-12' : data.design === 'social_post' ? 'pt-20' : 'pt-8'}`}></div>
-
-          {/* 1. Image Area (Draggable) */}
-          <div className="w-full flex flex-col items-center mb-6 shrink-0 relative z-10 px-0 group/img">
+          <div className={`w-full ${['window', 'browser', 'retro_mac', 'browser_retro'].includes(data.design) ? 'pt-12' : data.design === 'social_post' ? 'pt-20' : 'pt-8'}`}></div>
+          
+          {/* 1. Image Area (Draggable & Resizable) */}
+          <div className="w-full flex flex-col items-center mb-0 shrink-0 relative z-10 px-0 group/img">
              <div 
                  className={`
                  relative transition-shadow duration-300 cursor-move box-content
                  ${data.design === 'polaroid' ? 'border-[16px] border-white bg-slate-100 shadow-xl' : ''}
+                 ${selectedId === 'image-box' ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}
                  `}
                  style={{ 
                     width: ['polaroid'].includes(data.design) ? `${Math.min(data.imageWidth, 90)}%` : `${data.imageWidth}%`,
@@ -629,9 +793,17 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
                  }}
                  onPointerDown={(e) => handlePointerDown(e, 'image')}
              >
-                 {/* Drag Hint for Image */}
+                 {/* Drag Hint */}
                  <div className="absolute top-2 right-2 p-1 bg-black/30 rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity z-10 pointer-events-none">
                     <Move className="w-4 h-4 text-white" />
+                 </div>
+
+                 {/* Resize Handle (Bottom Right) */}
+                 <div 
+                     className="absolute -bottom-3 -right-3 p-1.5 bg-white border border-slate-300 rounded-full text-slate-700 shadow-sm cursor-nwse-resize opacity-0 group-hover/img:opacity-100 hover:opacity-100 hover:bg-slate-50 z-50 transition-opacity"
+                     onPointerDown={(e) => handlePointerDown(e, 'image', 'resize')}
+                 >
+                     <Scaling className="w-4 h-4" />
                  </div>
                  
                  {/* Special handling for corner brackets border which uses pseudo elements on container, or just add div overlay */}
@@ -675,30 +847,35 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
                  </div>
              </div>
           </div>
-          
-          {/* English Caption (Draggable) */}
+
+          {/* English Caption (Moved Between Image and Message) */}
           {data.englishCaption && (
             <div 
-                className="group/caption cursor-move relative z-20"
+                className={`group/caption cursor-move relative z-20 my-4 ${selectedId === 'caption-box' ? 'ring-1 ring-indigo-300 ring-offset-2 rounded-lg' : ''}`}
                 style={{
-                    transform: `translate(${data.englishCaptionPosition.x}px, ${data.englishCaptionPosition.y}px)`,
+                    transform: `translate(${data.englishCaptionPosition.x}px, ${data.englishCaptionPosition.y}px) scale(${data.englishCaptionScale || 1})`,
                     touchAction: 'none'
                 }}
                 onPointerDown={(e) => handlePointerDown(e, 'caption')}
             >
-                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 p-1 bg-black/10 rounded-full opacity-0 group-hover/caption:opacity-100 transition-opacity pointer-events-none">
-                    <Move className="w-3 h-3 text-black/50" />
+                 {/* Resize Handle for Caption */}
+                 <div 
+                     className="absolute -right-6 bottom-1/2 translate-y-1/2 p-1 bg-white border border-slate-300 rounded-full text-slate-700 shadow-sm cursor-ew-resize opacity-0 group-hover/caption:opacity-100 hover:opacity-100 hover:bg-slate-50 z-50 transition-opacity"
+                     onPointerDown={(e) => handlePointerDown(e, 'caption', 'scale')}
+                 >
+                     <Scaling className="w-3 h-3" />
                  </div>
-                 <p className="text-center font-serif italic opacity-90 text-sm md:text-base pointer-events-none select-none">
+
+                 <p className="text-center font-serif italic opacity-90 text-sm md:text-base pointer-events-none select-none px-4">
                      {data.englishCaption}
                  </p>
             </div>
           )}
 
-          {/* 2. Message Box (Draggable) */}
+          {/* 2. Message Box (Draggable & Resizable) */}
           <div className="w-full px-4 flex-1 flex flex-col items-center justify-center min-h-[150px] z-20 pb-12 relative">
              <div 
-                className={`transition-all duration-75 relative cursor-move group ${getMessageBoxClass(data.messageBoxStyle)}`}
+                className={`transition-all duration-75 relative cursor-move group/msg ${getMessageBoxClass(data.messageBoxStyle)} ${selectedId === 'message-box' ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}`}
                 style={{
                   transform: `translate(${data.messagePosition.x}px, ${data.messagePosition.y}px)`,
                   touchAction: 'none',
@@ -707,9 +884,17 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
                 }}
                 onPointerDown={(e) => handlePointerDown(e, 'message')}
              >
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 p-1 bg-black/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 p-1 bg-black/10 rounded-full opacity-0 group-hover/msg:opacity-100 transition-opacity pointer-events-none">
                     <Move className="w-3 h-3 text-black/50" />
                 </div>
+
+                {/* Resize Handle (Bottom Right - Width Only usually) */}
+                <div 
+                     className="absolute -bottom-3 -right-3 p-1.5 bg-white border border-slate-300 rounded-full text-slate-700 shadow-sm cursor-ew-resize opacity-0 group-hover/msg:opacity-100 hover:opacity-100 hover:bg-slate-50 z-50 transition-opacity"
+                     onPointerDown={(e) => handlePointerDown(e, 'message', 'resize')}
+                 >
+                     <Scaling className="w-4 h-4" />
+                 </div>
 
                 <div className="flex flex-col h-full pointer-events-none select-none">
                     <p 
@@ -796,7 +981,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ data, isViewMode = false, o
                   <div className="absolute -top-3 -right-3 p-1 bg-black/10 rounded-full opacity-0 group-hover/sender:opacity-100 transition-opacity pointer-events-none">
                     <Move className="w-3 h-3 text-black/50" />
                  </div>
-                  {data.senderLabel || (data.sender ? "From" : "")} {data.sender}
+                  {data.senderLabel || (data.sender ? "From." : "")} {data.sender}
               </div>
           )}
 

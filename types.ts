@@ -1,3 +1,5 @@
+
+
 export enum CardTheme {
   Christmas = '크리스마스',
   Birthday = '생일',
@@ -19,7 +21,9 @@ export type CardDesign =
   'rectangle' | 'ticket' | 'heart' | 'frame' | 'polaroid' | 'window' | 'stamp' | 'cloud' | 'phone' | 'game' | 'auto' |
   'arch' | 'tag' | 'hexagon_shape' | 'folder' | 'notebook_hole' | 'receipt' | 'film_strip' | 'browser' | 'book_cover' | 'mirror' |
   'origami_bird' | 'origami_boat' | 'origami_plane' | 'envelope_open' | 'paper_scroll' | 'clipboard' | 'puzzle_piece' | 'speech_bubble_shape' | 'calendar_sheet' | 'vinyl_record' |
-  'passport' | 'credit_card' | 'cassette' | 'floppy' | 'certificate' | 'wanted' | 'social_post' | 'video_thumbnail' | 'messenger' | 'retro_mac';
+  'passport' | 'credit_card' | 'cassette' | 'floppy' | 'certificate' | 'wanted' | 'social_post' | 'video_thumbnail' | 'messenger' | 'retro_mac' |
+  'magazine' | 'album_cover' | 'id_card' | 'game_cartridge' | 'billboard' | 'cinema_ticket' | 'browser_retro' | 'smartphone_chat' | 'instant_camera' | 'vinyl_sleeve' |
+  'music_player' | 'browser_popup' | 'tarot_card' | 'milk_carton' | 'shopping_bag' | 'lock_screen' | 'poker_card' | 'floppy_back' | 'train_ticket' | 'post_it_wall';
 
 export type MessageLength = 'xshort' | 'short' | 'medium' | 'long' | 'xlong';
 
@@ -28,21 +32,25 @@ export type MessageBoxStyle =
   'tape' | 'torn_paper' | 'gradient_border' | 'glass_dark' | 'terminal' | 'comic' | 'sketch' | 'plaque' | 'minimal_under' | 'elegant' |
   'rpg_dialog' | 'scroll_h' | 'ticket_stub' | 'post_stamp' | 'plaque_wooden' | 'plaque_stone' | 'cyber_hud' | 'leaf' | 'shout' | 'blob_soft' |
   'notification' | 'chat_send' | 'chat_receive' | 'steampunk' | 'blueprint' |
-  'sticky_tape_top' | 'sticky_tape_corners' | 'comic_dots' | 'pixel_bubble' | 'wood_dark' | 'metal_rust' | 'neon_pink' | 'neon_blue' | 'holographic' | 'parchment_old';
+  'sticky_tape_top' | 'sticky_tape_corners' | 'comic_dots' | 'pixel_bubble' | 'wood_dark' | 'metal_rust' | 'neon_pink' | 'neon_blue' | 'holographic' | 'parchment_old' |
+  'chat_bubble_ios' | 'toast_dark' | 'coding_terminal' | 'watercolor_patch' | 'sticky_crumpled' | 'glass_frosted' | 'neon_frame' | 'dashed_cutout' | 'embossed' | 'cyberpunk_panel';
 
 export type ImageMask = 
   'none' | 'rounded' | 'circle' | 'squircle' | 'heart' | 'cloud' | 'star' | 'hexagon' | 'custom' |
   'diamond' | 'triangle' | 'pentagon' | 'octagon' | 'blob_1' | 'blob_2' | 'arch_window' | 'tear_drop' | 'flower' | 'splatter' |
   'cross' | 'lightning' | 'cloud_fluffy' | 'stamp_cut' | 'puzzle_single' |
-  'shield' | 'butterfly' | 'maple_leaf' | 'sunburst' | 'keyhole' | 'parallelogram' | 'trapezoid' | 'ticket_cut' | 'chat_bubble' | 'stamp_detailed';
-
-// PhotoFrame types removed
+  'shield' | 'butterfly' | 'maple_leaf' | 'sunburst' | 'keyhole' | 'parallelogram' | 'trapezoid' | 'ticket_cut' | 'chat_bubble' | 'stamp_detailed' |
+  'ink_splat' | 'brush_stroke_mask' | 'puzzle_double' | 'stamp_grunge' | 'torn_edge_mask' | 'film_perforated_mask' | 'heart_pixel' | 'star_burst' | 'cloud_soft' | 'window_arch_gothic' |
+  'brush_heavy' | 'blob_scatter' | 'window_pane' | 'key_shape' | 'lamp_bulb' | 'leaf_monstera' | 'paw_print' | 'crown_shape' | 'dripping_paint' | 'slash_cut' |
+  // New 10
+  'bevel_corners' | 'ticket_stub_vertical' | 'shield_round' | 'blob_organic_3' | 'star_fat_5' | 'cross_rounded' | 'leaf_pointed' | 'hexagon_soft' | 'message_box_tail' | 'stamp_circle_notch';
 
 export type ImageBorder = 
   'none' | 'solid_thin' | 'solid_thick' | 'dashed' | 'dotted' | 'double' | 'groove' | 'ridge' | 'offset' | 'neon' | 'hand_drawn' |
   'inset' | 'outset' | 'thick_double' | 'outline_dashed' | 'layered_white' | 'ring_simple' | 'gold_trim' | 'silver_trim' | 'soft_glow' | 'vintage_frame' |
   'rainbow' | 'corner_brackets' | 'zigzag_border' | 'film_perforation' | 'tape_corners' |
-  'braided' | 'chain' | 'lace' | 'pearls' | 'scalloped' | 'film_slide' | 'gradient_ring' | 'glitch' | 'sketchy_double' | 'rainbow_dashed';
+  'braided' | 'chain' | 'lace' | 'pearls' | 'scalloped' | 'film_slide' | 'gradient_ring' | 'glitch' | 'sketchy_double' | 'rainbow_dashed' |
+  'vignette' | 'notched' | 'feathered' | 'crosshair' | 'warning' | 'stitching' | 'scanner' | 'crt' | 'blueprint_grid' | 'glowing_edges';
 
 export interface Decoration {
   id: string;
@@ -57,8 +65,7 @@ export interface CardData {
   theme: CardTheme;
   customTheme: string;
   
-  // New Background Color Field
-  backgroundColor: string; // 'auto' or hex code
+  backgroundColor: string; 
 
   recipient: string;
   recipientPosition: { x: number; y: number }; 
@@ -68,6 +75,7 @@ export interface CardData {
   
   englishCaption: string;
   englishCaptionPosition: { x: number; y: number };
+  englishCaptionScale: number; // Added for scaling
 
   message: string;
   messageLength: MessageLength;
@@ -86,7 +94,6 @@ export interface CardData {
   imageMask: ImageMask;
   customImageRadius: number; 
   
-  // photoFrame removed
   imageBorder: ImageBorder;
 
   design: CardDesign;
@@ -122,7 +129,6 @@ export const FontOptions = [
   { name: '고운 돋움', value: 'Gowun Dodum' },
   { name: '고운 바탕', value: 'Gowun Batang' },
   { name: '영문 필기체 (Dancing Script)', value: 'cursive' },
-  // New Fonts (10)
   { name: '나눔 붓글씨', value: 'Nanum Brush Script' },
   { name: '동글', value: 'Dongle' },
   { name: '구기', value: 'Gugig' },
@@ -133,6 +139,16 @@ export const FontOptions = [
   { name: '스타일리시', value: 'Stylish' },
   { name: '독도체', value: 'Dokdo' },
   { name: '동해 독도체', value: 'East Sea Dokdo' },
+  { name: '베이글 팻 원', value: 'Bagel Fat One' },
+  { name: '흑백사진', value: 'Black And White Picture' },
+  { name: '디필리아', value: 'Diphylleia' },
+  { name: '가석 원', value: 'Gasoek One' },
+  { name: '고딕 A1', value: 'Gothic A1' },
+  { name: 'IBM Plex Sans KR', value: 'IBM Plex Sans KR' },
+  { name: '모이라 원', value: 'Moirai One' },
+  { name: '나눔 고딕', value: 'Nanum Gothic' },
+  { name: '나눔 명조', value: 'Nanum Myeongjo' },
+  { name: '노토 산스 모노', value: 'Noto Sans Mono' },
 ];
 
 export const ImageStyleGroups = {
@@ -236,6 +252,18 @@ export const ImageStyleGroups = {
     { name: '아스키 아트 (ASCII)', value: 'ASCII Art Style, Visuals made of Text Characters, Retro Computer, Green on Black' },
     { name: '리소그래프 컬러', value: 'Risograph Color Print, Vibrant Pink and Blue, Grainy Texture, Misaligned Layers' },
     { name: '글리치 (심화)', value: 'Heavy Glitch Art, Data Corruption, Pixel Sorting, VHS Noise, Cyberpunk' },
+  ],
+  '새로운 스타일': [
+    { name: '지브리 스타일 (Anime)', value: 'Studio Ghibli Style, Anime Landscape, Lush Greenery, Fluffy Clouds, Peaceful' },
+    { name: '웹툰 (Webtoon)', value: 'Korean Webtoon Style, Clean Lines, Vibrant Colors, Manhwa Illustration' },
+    { name: '실루엣 아트 (Silhouette)', value: 'Silhouette Art, High Contrast, Black Foreground, Colorful Sunset Background' },
+    { name: '보태니컬 아트 (Botanical)', value: 'Vintage Botanical Illustration, Detailed Flower Drawing, Scientific Style' },
+    { name: '사이키델릭 (Psychedelic)', value: 'Psychedelic Art, Swirling Colors, Trippy Patterns, 60s Poster Style' },
+    { name: '멤피스 디자인 (Memphis)', value: 'Memphis Design, 80s Geometric Patterns, Squiggles, Pastel Colors, Flat' },
+    { name: '바우하우스 (Bauhaus)', value: 'Bauhaus Style, Geometric Shapes, Minimalist, Primary Colors, Functionality' },
+    { name: '아르 데코 (Art Deco)', value: 'Art Deco Style, Gold and Black, Geometric Patterns, Luxury, 1920s' },
+    { name: '그런지 (Grunge)', value: 'Grunge Texture, Distressed, Dirty, Street Style, Dark Mood' },
+    { name: '디오라마 (Diorama)', value: 'Miniature Diorama Box, 3D Cutout Layer, Shallow Depth of Field, Cute' },
   ]
 };
 
@@ -244,16 +272,16 @@ export const ImageStyleOptions = Object.values(ImageStyleGroups).flat();
 export const CardDesignOptions: { label: string; value: CardDesign }[] = [
   { label: '자동생성', value: 'auto' },
   { label: '기본 (Rectangle)', value: 'rectangle' },
-  { label: '아치형 (Arch)', value: 'arch' },
-  { label: '태그 (Tag)', value: 'tag' },
-  { label: '육각형 (Hexagon)', value: 'hexagon_shape' },
-  { label: '폴더 (Folder)', value: 'folder' },
+  { label: '아치형', value: 'arch' },
+  { label: '태그', value: 'tag' },
+  { label: '육각형', value: 'hexagon_shape' },
+  { label: '폴더', value: 'folder' },
   { label: '스프링 노트', value: 'notebook_hole' },
-  { label: '영수증 (Receipt)', value: 'receipt' },
-  { label: '필름 (Film)', value: 'film_strip' },
+  { label: '영수증', value: 'receipt' },
+  { label: '필름', value: 'film_strip' },
   { label: '브라우저', value: 'browser' },
   { label: '책 표지', value: 'book_cover' },
-  { label: '거울 (Mirror)', value: 'mirror' },
+  { label: '거울', value: 'mirror' },
   { label: '티켓', value: 'ticket' },
   { label: '하트', value: 'heart' },
   { label: '액자', value: 'frame' },
@@ -263,27 +291,54 @@ export const CardDesignOptions: { label: string; value: CardDesign }[] = [
   { label: '구름', value: 'cloud' },
   { label: '스마트폰', value: 'phone' },
   { label: '게임기', value: 'game' },
-  { label: '종이 새 (Origami Bird)', value: 'origami_bird' },
-  { label: '종이 배 (Origami Boat)', value: 'origami_boat' },
+  { label: '종이 새', value: 'origami_bird' },
+  { label: '종이 배', value: 'origami_boat' },
   { label: '종이 비행기', value: 'origami_plane' },
-  { label: '편지 봉투 (Open)', value: 'envelope_open' },
-  { label: '두루마리 (Scroll)', value: 'paper_scroll' },
+  { label: '편지 봉투', value: 'envelope_open' },
+  { label: '두루마리', value: 'paper_scroll' },
   { label: '클립보드', value: 'clipboard' },
   { label: '퍼즐 조각', value: 'puzzle_piece' },
   { label: '말풍선 모양', value: 'speech_bubble_shape' },
-  { label: '달력 (Calendar)', value: 'calendar_sheet' },
-  { label: '레코드판 (Vinyl)', value: 'vinyl_record' },
-  // New Designs (10)
-  { label: '여권 (Passport)', value: 'passport' },
+  { label: '달력', value: 'calendar_sheet' },
+  { label: '레코드판', value: 'vinyl_record' },
+  { label: '여권', value: 'passport' },
   { label: '신용카드', value: 'credit_card' },
   { label: '카세트 테이프', value: 'cassette' },
   { label: '플로피 디스크', value: 'floppy' },
-  { label: '상장 (Certificate)', value: 'certificate' },
-  { label: '현상수배서 (Wanted)', value: 'wanted' },
+  { label: '상장', value: 'certificate' },
+  { label: '현상수배서', value: 'wanted' },
   { label: 'SNS 포스트', value: 'social_post' },
   { label: '유튜브 썸네일', value: 'video_thumbnail' },
   { label: '메신저 앱', value: 'messenger' },
   { label: '레트로 PC', value: 'retro_mac' },
+  { label: '잡지 표지', value: 'magazine' },
+  { label: '앨범 커버', value: 'album_cover' },
+  { label: '사원증', value: 'id_card' },
+  { label: '게임팩', value: 'game_cartridge' },
+  { label: '빌보드', value: 'billboard' },
+  { label: '영화 티켓', value: 'cinema_ticket' },
+  { label: '레트로 브라우저', value: 'browser_retro' },
+  { label: '스마트폰 채팅', value: 'smartphone_chat' },
+  { label: '인스턴트 카메라', value: 'instant_camera' },
+  { label: 'LP 슬리브', value: 'vinyl_sleeve' },
+  { label: '뮤직 플레이어', value: 'music_player' },
+  { label: '브라우저 팝업', value: 'browser_popup' },
+  { label: '타로 카드', value: 'tarot_card' },
+  { label: '우유팩', value: 'milk_carton' },
+  { label: '쇼핑백', value: 'shopping_bag' },
+  { label: '잠금화면', value: 'lock_screen' },
+  { label: '포커 카드', value: 'poker_card' },
+  { label: '플로피 (뒷면)', value: 'floppy_back' },
+  { label: '기차표', value: 'train_ticket' },
+  { label: '포스트잇 벽', value: 'post_it_wall' },
+];
+
+export const MessageLengthOptions: { label: string; value: MessageLength }[] = [
+  { label: '매우 짧게 (1문장)', value: 'xshort' },
+  { label: '짧게 (2~3문장)', value: 'short' },
+  { label: '적당히 (4~5문장)', value: 'medium' },
+  { label: '길게 (6~8문장)', value: 'long' },
+  { label: '매우 길게 (편지)', value: 'xlong' },
 ];
 
 export const MessageBoxStyleOptions: { label: string; value: MessageBoxStyle }[] = [
@@ -295,8 +350,8 @@ export const MessageBoxStyleOptions: { label: string; value: MessageBoxStyle }[]
   { label: '터미널', value: 'terminal' },
   { label: '만화 효과', value: 'comic' },
   { label: '스케치', value: 'sketch' },
-  { label: '명판 (Plaque)', value: 'plaque' },
-  { label: '심플 라인 (하단)', value: 'minimal_under' },
+  { label: '명판', value: 'plaque' },
+  { label: '심플 라인', value: 'minimal_under' },
   { label: '엘레강스', value: 'elegant' },
   { label: '편지지', value: 'paper' },
   { label: '말풍선', value: 'bubble' },
@@ -315,20 +370,19 @@ export const MessageBoxStyleOptions: { label: string; value: MessageBoxStyle }[]
   { label: '네온', value: 'neon' },
   { label: 'RPG 대화창', value: 'rpg_dialog' },
   { label: '가로 두루마리', value: 'scroll_h' },
-  { label: '티켓 (Ticket)', value: 'ticket_stub' },
-  { label: '우표 (Stamp)', value: 'post_stamp' },
+  { label: '티켓', value: 'ticket_stub' },
+  { label: '우표', value: 'post_stamp' },
   { label: '나무 간판', value: 'plaque_wooden' },
   { label: '돌 비석', value: 'plaque_stone' },
   { label: '사이버 HUD', value: 'cyber_hud' },
   { label: '나뭇잎', value: 'leaf' },
-  { label: '외침 (Shout)', value: 'shout' },
-  { label: '블롭 (Soft)', value: 'blob_soft' },
-  { label: '알림창 (Notification)', value: 'notification' },
+  { label: '외침', value: 'shout' },
+  { label: '블롭', value: 'blob_soft' },
+  { label: '알림창', value: 'notification' },
   { label: '메신저 (보냄)', value: 'chat_send' },
   { label: '메신저 (받음)', value: 'chat_receive' },
   { label: '스팀펑크', value: 'steampunk' },
-  { label: '청사진 (Blueprint)', value: 'blueprint' },
-  // New Styles (10)
+  { label: '청사진', value: 'blueprint' },
   { label: '테이프 (상단)', value: 'sticky_tape_top' },
   { label: '테이프 (모서리)', value: 'sticky_tape_corners' },
   { label: '만화 (점박이)', value: 'comic_dots' },
@@ -339,6 +393,16 @@ export const MessageBoxStyleOptions: { label: string; value: MessageBoxStyle }[]
   { label: '네온 (블루)', value: 'neon_blue' },
   { label: '홀로그램', value: 'holographic' },
   { label: '오래된 양피지', value: 'parchment_old' },
+  { label: '채팅 (iOS)', value: 'chat_bubble_ios' },
+  { label: '토스트 알림', value: 'toast_dark' },
+  { label: '코딩 터미널', value: 'coding_terminal' },
+  { label: '수채화 패치', value: 'watercolor_patch' },
+  { label: '구겨진 종이', value: 'sticky_crumpled' },
+  { label: '반투명 (Frosted)', value: 'glass_frosted' },
+  { label: '네온 프레임', value: 'neon_frame' },
+  { label: '점선 컷', value: 'dashed_cutout' },
+  { label: '엠보싱', value: 'embossed' },
+  { label: '사이버펑크 패널', value: 'cyberpunk_panel' },
 ];
 
 export const ImageMaskOptions: { label: string; value: ImageMask }[] = [
@@ -364,28 +428,49 @@ export const ImageMaskOptions: { label: string; value: ImageMask }[] = [
   { label: '번개', value: 'lightning' },
   { label: '뭉게 구름', value: 'cloud_fluffy' },
   { label: '우표 컷', value: 'stamp_cut' },
-  { label: '퍼즐 조각 (싱글)', value: 'puzzle_single' },
-  // New Masks (10)
+  { label: '퍼즐 조각', value: 'puzzle_single' },
   { label: '방패', value: 'shield' },
   { label: '나비', value: 'butterfly' },
   { label: '단풍잎', value: 'maple_leaf' },
-  { label: '햇살 (Sunburst)', value: 'sunburst' },
+  { label: '햇살', value: 'sunburst' },
   { label: '열쇠구멍', value: 'keyhole' },
   { label: '평행사변형', value: 'parallelogram' },
   { label: '사다리꼴', value: 'trapezoid' },
   { label: '티켓 (양쪽 컷)', value: 'ticket_cut' },
-  { label: '말풍선 (이미지)', value: 'chat_bubble' },
+  { label: '말풍선', value: 'chat_bubble' },
   { label: '우표 (정교함)', value: 'stamp_detailed' },
-  
   { label: '기타 (입력형)', value: 'custom' },
-];
-
-export const MessageLengthOptions: { label: string; value: MessageLength }[] = [
-  { label: '매우 짧게 (핵심만)', value: 'xshort' },
-  { label: '짧게 (2~3문장)', value: 'short' },
-  { label: '보통 (4~5문장)', value: 'medium' },
-  { label: '길게 (마음을 담아)', value: 'long' },
-  { label: '매우 길게 (편지)', value: 'xlong' },
+  { label: '잉크 얼룩', value: 'ink_splat' },
+  { label: '붓터치', value: 'brush_stroke_mask' },
+  { label: '퍼즐 (더블)', value: 'puzzle_double' },
+  { label: '도장 (빈티지)', value: 'stamp_grunge' },
+  { label: '찢어진 모서리', value: 'torn_edge_mask' },
+  { label: '필름 구멍', value: 'film_perforated_mask' },
+  { label: '픽셀 하트', value: 'heart_pixel' },
+  { label: '스타 버스트', value: 'star_burst' },
+  { label: '부드러운 구름', value: 'cloud_soft' },
+  { label: '고딕 아치', value: 'window_arch_gothic' },
+  { label: '거친 붓', value: 'brush_heavy' },
+  { label: '물감 흩뿌림', value: 'blob_scatter' },
+  { label: '창문 격자', value: 'window_pane' },
+  { label: '열쇠', value: 'key_shape' },
+  { label: '전구', value: 'lamp_bulb' },
+  { label: '몬스테라 잎', value: 'leaf_monstera' },
+  { label: '발바닥', value: 'paw_print' },
+  { label: '왕관', value: 'crown_shape' },
+  { label: '흐르는 페인트', value: 'dripping_paint' },
+  { label: '베기 효과', value: 'slash_cut' },
+  // New 10
+  { label: '모따기 (Bevel)', value: 'bevel_corners' },
+  { label: '티켓 (세로)', value: 'ticket_stub_vertical' },
+  { label: '방패 (원형)', value: 'shield_round' },
+  { label: '블롭 (유기적3)', value: 'blob_organic_3' },
+  { label: '통통한 별', value: 'star_fat_5' },
+  { label: '둥근 십자가', value: 'cross_rounded' },
+  { label: '나뭇잎 (뾰족)', value: 'leaf_pointed' },
+  { label: '육각형 (Soft)', value: 'hexagon_soft' },
+  { label: '메시지 꼬리', value: 'message_box_tail' },
+  { label: '도장 (노치)', value: 'stamp_circle_notch' },
 ];
 
 export const ImageBorderOptions: { label: string; value: ImageBorder }[] = [
@@ -415,7 +500,6 @@ export const ImageBorderOptions: { label: string; value: ImageBorder }[] = [
     { label: '지그재그', value: 'zigzag_border' },
     { label: '필름 구멍', value: 'film_perforation' },
     { label: '테이프 (코너)', value: 'tape_corners' },
-    // New Borders (10)
     { label: '땋은 줄', value: 'braided' },
     { label: '사슬', value: 'chain' },
     { label: '레이스', value: 'lace' },
@@ -426,4 +510,14 @@ export const ImageBorderOptions: { label: string; value: ImageBorder }[] = [
     { label: '글리치 보더', value: 'glitch' },
     { label: '스케치 (이중)', value: 'sketchy_double' },
     { label: '무지개 점선', value: 'rainbow_dashed' },
+    { label: '비네트 (Vignette)', value: 'vignette' },
+    { label: '노치 (Notched)', value: 'notched' },
+    { label: '깃털 (Feathered)', value: 'feathered' },
+    { label: '크로스헤어', value: 'crosshair' },
+    { label: '경고 테이프', value: 'warning' },
+    { label: '스티치 (Stitching)', value: 'stitching' },
+    { label: '스캐너 (Scanner)', value: 'scanner' },
+    { label: 'CRT 스캔라인', value: 'crt' },
+    { label: '청사진 그리드', value: 'blueprint_grid' },
+    { label: '빛나는 가장자리', value: 'glowing_edges' },
 ];
